@@ -10,7 +10,8 @@ class Assets:
         self.img_bullet = [
             pygame.image.load(Assets.make_absolute_path("/assets/bullet.png")).convert_alpha(),
             pygame.image.load(Assets.make_absolute_path("/assets/bullet_enemy1.png")).convert_alpha(),
-            pygame.image.load(Assets.make_absolute_path("/assets/bullet_enemy2.png")).convert_alpha()
+            pygame.image.load(Assets.make_absolute_path("/assets/bullet_enemy2.png")).convert_alpha(),
+            pygame.image.load(Assets.make_absolute_path("/assets/bullet.png")).convert_alpha()
         ]
         self.imgs_player_ship = [
             pygame.image.load(Assets.make_absolute_path("/assets/starship.png")).convert_alpha(),
@@ -25,11 +26,17 @@ class Assets:
             pygame.image.load(Assets.make_absolute_path("/assets/explosion4.png")).convert_alpha(),
             pygame.image.load(Assets.make_absolute_path("/assets/explosion5.png")).convert_alpha()
         ]
+        self.imgs_missile = [
+            pygame.image.load(Assets.make_absolute_path("/assets/missile0.png")).convert_alpha(),
+            pygame.image.load(Assets.make_absolute_path("/assets/missile1.png")).convert_alpha(),
+            pygame.image.load(Assets.make_absolute_path("/assets/missile2.png")).convert_alpha()
+        ]
         self.imgs_asteroid = [
             pygame.image.load(Assets.make_absolute_path("/assets/asteroid_big.png")).convert_alpha(),
             pygame.image.load(Assets.make_absolute_path("/assets/asteroid_small.png")).convert_alpha(),
             pygame.image.load(Assets.make_absolute_path("/assets/enemy1.png")).convert_alpha(),
-            pygame.image.load(Assets.make_absolute_path("/assets/enemy2.png")).convert_alpha()
+            pygame.image.load(Assets.make_absolute_path("/assets/enemy2.png")).convert_alpha(),
+            pygame.image.load(Assets.make_absolute_path("/assets/enemy3.png")).convert_alpha()
         ]
         self.imgs_diamond = [
             pygame.image.load(Assets.make_absolute_path("/assets/diamond_0.png")).convert_alpha(),
@@ -48,7 +55,11 @@ class Assets:
             pygame.image.load(Assets.make_absolute_path("/assets/fire_3.png")).convert_alpha(),
             pygame.image.load(Assets.make_absolute_path("/assets/fire_4.png")).convert_alpha(),
             pygame.image.load(Assets.make_absolute_path("/assets/fire_5.png")).convert_alpha()
-            
+        ]
+        self.imgs_pickup = [
+            pygame.image.load(Assets.make_absolute_path("/assets/item_spread.png")).convert_alpha(),
+            pygame.image.load(Assets.make_absolute_path("/assets/item_piercing.png")).convert_alpha(),
+            pygame.image.load(Assets.make_absolute_path("/assets/item_auto.png")).convert_alpha()
         ]
         self.sounds_rock = [
             pygame.mixer.Sound(Assets.make_absolute_path("/assets/rock2.ogg")),

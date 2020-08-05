@@ -5,6 +5,8 @@ from pygame.locals import *
 from assets import Assets
 import numpy as np
 
+DEBUG_START_LEVEL = 3
+
 ASSETS = None
 WINDOW_W = 920
 WINDOW_H = 720
@@ -13,7 +15,7 @@ FPS = 60
 BLINK_SPEED = 8
 GAMESTATE = {"title":0, "game":1, "exploding":2, "gameover":3, "pause":4}
 g_gamestate = GAMESTATE["title"]
-g_level = 0
+g_level = DEBUG_START_LEVEL
 # 背景
 g_bg_pos        = {"x":0, "y":0}
 BG_SCROLL_SPEED = {"x":1, "y":1}
@@ -34,10 +36,11 @@ SMOKE_OFFSET = 30
 # 弾丸
 MAX_BULLETS = 100
 obj_bullets = [None]*MAX_BULLETS
-BULLET_TYPE = {"player":0, "enemy1":1, "enemy2":2}
+BULLET_TYPE = {"player":0, "enemy1":1, "enemy2":2, "player_piercing":3, "enemy_missile":4}
 BULLET_OFFSET = 40
 BULLET_SPEED_PLAYER = 10
-BULLET_SPEED_ENEMY = 3
+BULLET_SPEED_ENEMY_INTERCEPTOR = 3
+BULLET_SPEED_ENEMY_FIGHTER = 5
 # 隕石
 LVUP_RATE = 30*FPS
 g_spawnrate = 3*FPS
@@ -46,7 +49,7 @@ obj_asteroids = [None]*MAX_ASTEROIDS
 ASTEROID_HIT_RADIUS = 40
 ASTEROID_HIT_RADIUS_SMALL = 25
 ASTEROID_SIZE = {"big":1.5, "mid":1.0, "small":0.75}
-ASTEROID_TYPE = {"big":0, "small":1, "enemyship1":2, "enemyship2":3}
+ASTEROID_TYPE = {"big":0, "small":1, "enemyship1":2, "enemyship2":3, "enemyship3":4}
 ASTEROID_NUM_DEBRIS = {"big":3, "mid":2, "small":1}
 FLY_TO_PLAYER = 4   # プレイヤーに向かって飛ぶ確立(0:100% ~ )
 # エフェクト
@@ -56,12 +59,17 @@ ANIMATION_COUNT = 3
 EFFECT_EXPLOSION_FRAMES = 5
 EFFECT_TYPE = {"explosion":0, "fire":1}
 # ピックアップ
-MAX_PICKUP = 10
+MAX_PICKUP = 20
+PICKUP_TYPE = {"diamond":100}
+POWERUP_TYPE = {"three_shot":0, "piercing_shot":1, "auto_shot":2}
+POWERUP_NUM = 3
+g_player_pickup_effects = [0]*POWERUP_NUM
 obj_pickups = [None]*MAX_PICKUP
 DIAMOND_DROP_RATE = 5
 PICKUP_RADIUS = 50
 DIAMOND_LIFE = 10 * FPS
 DIAMOND_BLINK = 5 * FPS
+POWERUP_DURATION = 10 * FPS
 # スコア
 g_score = 0
 SCORE_HIT_BIG = 100
@@ -70,7 +78,33 @@ SCORE_DIAMOND = 1000
 g_money = 0
 MONEY_DIAMOND = 1000
 
-def draw_text(screen, text, x, y, color, font, anchor_center=True):
+# メッセージ
+g_message_timer = 0
+g_message = ""
+
+
+def clear_message():
+    g_message_timer = 0
+    g_message = ""
+def make_message(msg, important=False):
+    global g_message, g_message_timer
+    if important or g_message_timer < g_timer:
+        g_message_timer = g_timer + 2*FPS
+        g_message = msg
+
+def player_pickup(type):
+    if type == POWERUP_TYPE["three_shot"]:
+        make_message("Spread Shot")
+    elif type == POWERUP_TYPE["piercing_shot"]:
+        make_message("Piercing Shot")
+    elif type == POWERUP_TYPE["auto_shot"]:
+        make_message("Fullauto Shot")
+    g_player_pickup_effects[type] += POWERUP_DURATION 
+
+def player_upgrade_available(pickup_type):
+    return 0 < g_player_pickup_effects[pickup_type]
+
+def draw_text(screen, text, x, y, color, font, anchor_center=True): 
     """
     影付きの文字を描画する
     """
@@ -90,15 +124,22 @@ def get_dis(x1, y1, x2, y2):
     """
     return math.sqrt( (x1-x2)**2 + (y1-y2)**2 )
 
-def create_effect(x, y, type):
+def create_effect(x, y, type, size=1.0):
     for i in range(MAX_EFFECTS):
         if obj_effects[i] is None:
-            obj_effects[i] = {"x":x, "y":y, "count":0, "type":type}
+            obj_effects[i] = {"x":x, "y":y, "count":0, "type":type, "s":size}
             return
 
 def create_enemy(pos=None, new_size=None, new_type=ASTEROID_TYPE["big"]):
     """
     隕石を作成(単体)
+    x,y 座標
+    rv  進行方向(deg)
+    r   描画方向(deg)
+    rot_speed   回転速度
+    s   スケール
+    type    種類
+    timer   作成された時間
     """
     global obj_asteroids
     x = y = size = 0
@@ -126,6 +167,8 @@ def create_enemy(pos=None, new_size=None, new_type=ASTEROID_TYPE["big"]):
                 size = 0.6
             elif new_type == ASTEROID_TYPE["enemyship2"]:
                 size = 0.8
+            elif new_type == ASTEROID_TYPE["enemyship3"]:
+                size = 1.0
             else:
                 if new_size is None:
                     size = ASTEROID_SIZE[random.choice(("big","mid","small"))]
@@ -139,17 +182,33 @@ def create_enemy(pos=None, new_size=None, new_type=ASTEROID_TYPE["big"]):
                 rv = random.randint(0,359)
 
             # 描画角度
-            if new_type in (ASTEROID_TYPE["enemyship1"], ASTEROID_TYPE["enemyship2"]):
+            if new_type in (ASTEROID_TYPE["enemyship1"], ASTEROID_TYPE["enemyship2"], ASTEROID_TYPE["enemyship3"]):
                 r = rv
             else:
                 r = random.randint(0,359)
+
+            # 回転速度
+            rs = 0
+            # if new_type == ASTEROID_TYPE["enemyship2"]:
+            #     rs = 10
+
+            # 速度
+            velocity = random.choice([0.8,1.0,1.2])
+            if new_type == ASTEROID_TYPE["enemyship1"]:
+                velocity = 2
+            elif new_type == ASTEROID_TYPE["enemyship2"]:
+                velocity = 2
+            elif new_type == ASTEROID_TYPE["enemyship3"]:
+                velocity = 2
 
             obj_asteroids[i] = {
                 "x": x, 
                 "y": y, 
                 "r": r, 
                 "rv": rv, 
+                "rot_speed": rs,
                 "s": size,
+                "velocity": velocity,
                 "type": new_type,
                 "timer": g_timer-random.randint(0,FPS)
                 }
@@ -163,6 +222,7 @@ def create_enemies():
     sec = g_timer / 60
     if g_level == 0:
         if g_timer % (LVUP_RATE) == 0 and g_timer != 0:
+            make_message("Enemy Interceptors Incoming!", important=True)
             g_level += 1
             g_spawnrate = int(2*FPS)
         if g_timer%g_spawnrate == 0:
@@ -171,6 +231,7 @@ def create_enemies():
         if g_timer % (LVUP_RATE) == 0 and g_timer != 0:
             g_level += 1
             g_spawnrate = int(2*FPS)
+            make_message("Enemy Fighter Incoming!", important=True)
         if g_timer%g_spawnrate == 0:
             rand = random.randint(0,3)
             if rand == 0:
@@ -199,12 +260,17 @@ def create_enemies():
                 create_enemy(new_type=ASTEROID_TYPE["enemyship1"])
             elif rand == 1:
                 create_enemy(new_type=ASTEROID_TYPE["enemyship2"])
+            elif rand == 2:
+                create_enemy(new_type=ASTEROID_TYPE["enemyship3"])
             else:
                 create_enemy()
    
 def destry_asteroid(index):
+    """
+    敵の破壊処理
+    """
     # エフェクトを作成
-    create_effect(obj_asteroids[index]["x"], obj_asteroids[index]["y"], type=EFFECT_TYPE["explosion"])
+    create_effect(obj_asteroids[index]["x"], obj_asteroids[index]["y"], type=EFFECT_TYPE["explosion"], size=1.0)
     ASSETS.play("rock")
     if obj_asteroids[index]["type"] == ASTEROID_TYPE["big"]:
         # デブリを作成
@@ -230,15 +296,21 @@ def destry_asteroid(index):
                 create_enemy(pos, size, ASTEROID_TYPE["small"])
         # ダイアモンドを作成
         if random.randint(0,DIAMOND_DROP_RATE) == 0:
-            for i in range(MAX_PICKUP):
-                if obj_pickups[i] is None:
-                    obj_pickups[i] = {"x":obj_asteroids[index]["x"], "y":obj_asteroids[index]["y"], "type":"diamond", "r":0, "s":1, "rv":random.randint(0,359), "timer":g_timer}
-                    break
+            create_type = random.choice([PICKUP_TYPE["diamond"], POWERUP_TYPE["three_shot"], POWERUP_TYPE["piercing_shot"],POWERUP_TYPE["auto_shot"]])
+            create_pickup(obj_pickups, create_type, obj_asteroids[index]["x"], obj_asteroids[index]["y"])
         obj_asteroids[index] = None
     else:
         obj_asteroids[index] = None
 
-def shoot_bullet(type=BULLET_TYPE["player"], pos=None, angle=None):
+def shoot_bullet_player():
+    if player_upgrade_available(POWERUP_TYPE["three_shot"]):
+        shoot_bullet(BULLET_TYPE["player"], None, g_player_angle-10)
+        shoot_bullet(BULLET_TYPE["player"], None, g_player_angle)
+        shoot_bullet(BULLET_TYPE["player"], None, g_player_angle+10)
+    else:
+        shoot_bullet(BULLET_TYPE["player"], None, g_player_angle)
+
+def shoot_bullet(type=BULLET_TYPE["player"], pos=None, angle=None, speed=0):
     """
     弾を発射
     """
@@ -246,18 +318,40 @@ def shoot_bullet(type=BULLET_TYPE["player"], pos=None, angle=None):
     for i in range(MAX_BULLETS):
         if obj_bullets[i] is None:
             if type == BULLET_TYPE["player"]:
-                bullet_x = g_player_pos["x"] - BULLET_OFFSET * math.sin(math.radians(g_player_angle))
-                bullet_y = g_player_pos["y"] - BULLET_OFFSET * math.cos(math.radians(g_player_angle))
-                angle = g_player_angle
+                bullet_x = g_player_pos["x"] - BULLET_OFFSET * math.sin(math.radians(angle))
+                bullet_y = g_player_pos["y"] - BULLET_OFFSET * math.cos(math.radians(angle))
                 ASSETS.play("shot")
-                size = 0.4
+                if player_upgrade_available(POWERUP_TYPE["piercing_shot"]):
+                    size = 1.0
+                    type = BULLET_TYPE["player_piercing"]
+                else:  
+                    size = 0.4
+            elif type == BULLET_TYPE["enemy_missile"]:
+                bullet_x = pos[0] - BULLET_OFFSET * math.sin(math.radians(angle))
+                bullet_y = pos[1] - BULLET_OFFSET * math.cos(math.radians(angle))
+                ASSETS.play("shot2")
+                size = 1.5
             else:
                 bullet_x = pos[0] - BULLET_OFFSET * math.sin(math.radians(angle))
                 bullet_y = pos[1] - BULLET_OFFSET * math.cos(math.radians(angle))
                 ASSETS.play("shot2")
                 size = 0.6
-            obj_bullets[i] = {"x":bullet_x, "y":bullet_y, "r":angle, "s":size, "type":type, "timer":g_timer}
+            obj_bullets[i] = {"x":bullet_x, "y":bullet_y, "r":angle, "s":size, "type":type, "timer":g_timer, "speed":speed}
             
+            break
+
+def create_pickup(obj_list, spawn_type, spawn_x, spawn_y):
+    """
+    ピックアップを作成
+    """
+    s = None
+    if spawn_type == PICKUP_TYPE["diamond"]:
+        s = 1.25
+    else:
+        s = 0.5
+    for i in range(MAX_PICKUP):
+        if obj_list[i] is None:
+            obj_list[i] = {"x":spawn_x, "y":spawn_y, "s":s, "type":spawn_type, "rv":random.randint(0,359), "timer":g_timer}
             break
 
 def update_objects(screen):
@@ -270,8 +364,12 @@ def update_objects(screen):
         obj = obj_asteroids[i]
         if obj is not None:
             # 敵の移動
-            obj["x"] -= 1 * math.sin(math.radians(obj["rv"]))
-            obj["y"] -= 1 * math.cos(math.radians(obj["rv"]))
+            if obj["type"] == ASTEROID_TYPE["enemyship2"]:
+                obj["rot_speed"] = 50*math.sin(math.radians((g_timer-obj["timer"])/10))
+            obj["r"] += obj["rot_speed"] / FPS
+            obj["rv"] += obj["rot_speed"] / FPS
+            obj["x"] -= obj["velocity"] * math.sin(math.radians(obj["rv"]))
+            obj["y"] -= obj["velocity"] * math.cos(math.radians(obj["rv"]))
             if obj["x"] < -WINDOW_OUT:
                 obj["x"] = WINDOW_W + WINDOW_OUT
             if WINDOW_W + WINDOW_OUT < obj["x"]:
@@ -288,27 +386,58 @@ def update_objects(screen):
                 (obj["x"]-sprite.get_width()/2, obj["y"]-sprite.get_height()/2), 
                 obj["r"], 
                 obj["s"])
-            # 敵船1
-            if obj["type"] == ASTEROID_TYPE["enemyship1"] or obj["type"] == ASTEROID_TYPE["enemyship2"]:
+                
+            if obj["type"] in (ASTEROID_TYPE["enemyship1"], ASTEROID_TYPE["enemyship2"], ASTEROID_TYPE["enemyship3"]):
                 # 敵弾を発射
+                speed = 1
                 if obj["type"] == ASTEROID_TYPE["enemyship2"]:
+                    speed = BULLET_SPEED_ENEMY_FIGHTER
                     type = BULLET_TYPE["enemy2"]
                     r = math.degrees(math.atan2(-(g_player_pos["y"]-obj["y"]), (g_player_pos["x"]-obj["x"]) ))-90
+                elif obj["type"] == ASTEROID_TYPE["enemyship3"]:
+                    speed = BULLET_SPEED_ENEMY_FIGHTER
+                    type = BULLET_TYPE["enemy2"]
+                    distance = get_dis(g_player_pos["x"],g_player_pos["y"], obj["x"],obj["y"])
+                    target_x = g_player_pos["x"] - g_player_velosity["x"] * distance / BULLET_SPEED_ENEMY_FIGHTER /2
+                    target_y = g_player_pos["y"] - g_player_velosity["y"] * distance / BULLET_SPEED_ENEMY_FIGHTER /2
+                    r = math.degrees(math.atan2(-(target_y-obj["y"]), (target_x-obj["x"]) ))-90
+                    timer = (obj["timer"] - g_timer) % (4*FPS)
+                    if timer == 0:
+                        shoot_bullet(type, (obj["x"], obj["y"]), r+5, speed)
+                        #shoot_bullet(type, (obj["x"], obj["y"]), r, speed*1.05)
+                        shoot_bullet(BULLET_TYPE["enemy_missile"], (obj["x"], obj["y"]), r, 2)
+                        shoot_bullet(type, (obj["x"], obj["y"]), r-5, speed)
+                    continue
                 else:
                     type = BULLET_TYPE["enemy1"]
+                    speed = BULLET_SPEED_ENEMY_INTERCEPTOR
                     r = obj["r"]
                 if (obj["timer"] - g_timer) % (3*FPS)  == 0:
-                    shoot_bullet(type, (obj["x"], obj["y"]), r)
+                    shoot_bullet(type, (obj["x"], obj["y"]), r, speed)
     # 弾
     for i in range(MAX_BULLETS):
         bullet = obj_bullets[i]
         if bullet is not None:
             draw = False
             type = bullet["type"]
-            if type == BULLET_TYPE["player"]:
+            # ミサイルの方向調整・煙
+            if type == BULLET_TYPE["enemy_missile"]:
+                end = math.degrees(math.atan2(-(g_player_pos["y"]-bullet["y"]), (g_player_pos["x"]-bullet["x"]) ))-90
+                start = bullet["r"]
+                shortest_angle = ((end-start) + 180) % 360 - 180
+                shortest_angle = min(shortest_angle, 1)
+                shortest_angle = max(-1, shortest_angle)
+                print(shortest_angle)
+                bullet["rv"] = bullet["r"] = start + shortest_angle
+                if int(g_timer % 3) == 0:
+                    smoke_x = bullet["x"] + 10 * math.sin(math.radians(bullet["r"]))
+                    smoke_y = bullet["y"] + 10 * math.cos(math.radians(bullet["r"]))
+                    create_effect(smoke_x, smoke_y, EFFECT_TYPE["fire"], 0.5)
+            # 貫通弾
+            if type in (BULLET_TYPE["player"], BULLET_TYPE["player_piercing"]):
                 speed = BULLET_SPEED_PLAYER
             else:
-                speed = BULLET_SPEED_ENEMY
+                speed = bullet["speed"]
             # 移動
             bullet["x"] -= speed * math.sin(math.radians(bullet["r"]))
             bullet["y"] -= speed * math.cos(math.radians(bullet["r"]))
@@ -316,7 +445,7 @@ def update_objects(screen):
             if not -WINDOW_OUT <= bullet["x"] <= WINDOW_W + WINDOW_OUT or not -WINDOW_OUT <= bullet["y"] <= WINDOW_H + WINDOW_OUT:
                 obj_bullets[i] = None
                 continue
-            if type == BULLET_TYPE["player"]:
+            if type in (BULLET_TYPE["player"], BULLET_TYPE["player_piercing"]):
                 # プレイヤーの弾
                 # 隕石との衝突判定
                 for j in range(MAX_ASTEROIDS):
@@ -328,9 +457,12 @@ def update_objects(screen):
                             hit_radius = ASTEROID_HIT_RADIUS
                         if (get_dis(asteroid["x"], asteroid["y"], bullet["x"], bullet["y"]) < hit_radius*obj_asteroids[j]["s"]):
                             destry_asteroid(j)
-                            obj_bullets[i] = None
                             g_score += SCORE_HIT_BIG
-                            break
+                            if type == BULLET_TYPE["player_piercing"]:
+                                pass
+                            else:
+                                obj_bullets[i] = None
+                            break 
                 else:
                     draw = True
             else:
@@ -342,7 +474,10 @@ def update_objects(screen):
                 draw = True
             if draw:
                 # 弾を描画
-                sprite = ASSETS.img_bullet[type]
+                if type == BULLET_TYPE["enemy_missile"]:
+                    sprite = ASSETS.imgs_missile[0]
+                else:
+                    sprite = ASSETS.img_bullet[type]
                 x, y = bullet["x"]-sprite.get_width()/2, bullet["y"]-sprite.get_height()/2
                 blit_rotate_center(screen, sprite, (x, y), bullet["r"], bullet["s"])
     # エフェクト
@@ -365,7 +500,7 @@ def update_objects(screen):
                 obj_effects[i] = None
                 continue
             else:
-                img_effect = pygame.transform.rotozoom(img[index], 0, size)
+                img_effect = pygame.transform.rotozoom(img[index], 0, effect["s"])
                 screen.blit(img_effect, [effect["x"]-img_effect.get_width()/2, effect["y"]-img_effect.get_height()/2])
     # ピックアップの更新
     for i in range(MAX_PICKUP):
@@ -401,12 +536,17 @@ def update_objects(screen):
             if get_dis(pickup["x"], pickup["y"], g_player_pos["x"], g_player_pos["y"]) < PICKUP_RADIUS:
                 # 拾う
                 ASSETS.play("pickup")
-                g_score += SCORE_DIAMOND
-                g_money += MONEY_DIAMOND
+                if pickup["type"] == PICKUP_TYPE["diamond"]:
+                    g_score += SCORE_DIAMOND
+                    g_money += MONEY_DIAMOND
+                else:
+                    g_score += SCORE_DIAMOND
+                    player_pickup(pickup["type"])
                 obj_pickups[i] = None
                 continue
             # 描画
             passed_time = g_timer - pickup["timer"]
+            # 自然消滅・点滅
             if passed_time > DIAMOND_LIFE + DIAMOND_BLINK:
                 # 消滅
                 pickup = None
@@ -416,8 +556,13 @@ def update_objects(screen):
                 if  0 <= (g_timer % BLINK_SPEED) <= BLINK_SPEED / 2:
                     continue
             #描画
-            sprite =  ASSETS.imgs_diamond[int(g_timer % (len(ASSETS.imgs_diamond)* ANIMATION_COUNT) / ANIMATION_COUNT)]
-            sprite = pygame.transform.rotozoom(sprite, 0, 1.25)
+            sprite = None
+            pickup_type = pickup["type"]
+            if pickup_type == PICKUP_TYPE["diamond"]:
+                sprite =  ASSETS.imgs_diamond[int(g_timer % (len(ASSETS.imgs_diamond)* ANIMATION_COUNT) / ANIMATION_COUNT)]
+            else:
+                sprite =  ASSETS.imgs_pickup[pickup_type]
+            sprite = pygame.transform.rotozoom(sprite, 0, pickup["s"])
             screen.blit(sprite, [pickup["x"]-sprite.get_width()/2, pickup["y"]-sprite.get_height()/2])
             
 
@@ -434,6 +579,13 @@ def move_starship(screen, key):
     プレイヤーの操作
     """
     global g_player_pos, g_player_angle, g_player_velosity, g_player_life, g_respawn_timer
+    for i in range(3):
+        if g_player_pickup_effects[i] > 0:
+            g_player_pickup_effects[i] -= 1
+    # オート射撃
+    if player_upgrade_available(POWERUP_TYPE["auto_shot"]) and key[K_SPACE]:
+        if g_timer % 5 == 0:
+            shoot_bullet_player()
     if key[K_UP] or key[K_w]:
         # 加速
         g_player_velosity["x"] += CTRL_MOVE_SPEED * math.sin(math.radians(g_player_angle))
@@ -446,7 +598,7 @@ def move_starship(screen, key):
         if int(g_timer % 3) == 0:
             smoke_x = g_player_pos["x"] + SMOKE_OFFSET * math.sin(math.radians(g_player_angle))
             smoke_y = g_player_pos["y"] + SMOKE_OFFSET * math.cos(math.radians(g_player_angle))
-            create_effect(smoke_x, smoke_y, EFFECT_TYPE["fire"])
+            create_effect(smoke_x, smoke_y, EFFECT_TYPE["fire"], 0.7)
     
     # 旋回
     if key[K_RIGHT] or key[K_d]:
@@ -492,9 +644,12 @@ def move_starship(screen, key):
                 destry_asteroid(j)
 
 def player_damage():
+    """
+    プレイヤーへのダメージ処理
+    """
     global g_player_life, g_respawn_timer
     ASSETS.play("rock")
-    create_effect(g_player_pos["x"], g_player_pos["y"], EFFECT_TYPE["explosion"])
+    create_effect(g_player_pos["x"], g_player_pos["y"], EFFECT_TYPE["explosion"], 1.0)
     g_player_life -= 1
     g_respawn_timer = g_timer
 
@@ -545,15 +700,15 @@ def main():
                         g_gamestate = GAMESTATE["pause"]
                 # SPACEキー
                 if event.key == K_SPACE:
-                    if g_gamestate == GAMESTATE["game"]:
-                        shoot_bullet()
+                    if g_gamestate == GAMESTATE["game"] and not player_upgrade_available(POWERUP_TYPE["auto_shot"]):
+                        shoot_bullet_player()
                     elif g_gamestate == GAMESTATE["pause"]:
                         g_gamestate = GAMESTATE["game"]
             if event.type == KEYUP:
                 if event.key == K_SPACE:
                     if g_gamestate == GAMESTATE["title"]:
                         g_timer = 0
-                        g_level = 0
+                        g_level = DEBUG_START_LEVEL
                         g_score = 0
                         g_money = 0
                         timer_pause = 0
@@ -563,11 +718,13 @@ def main():
                         g_player_angle = 0
                         g_player_life = 3
                         g_respawn_timer = -PLAYER_SESPAWN_TIME
+                        g_player_pickup_effects = [0]*POWERUP_NUM
                         obj_bullets = [None]*MAX_BULLETS
                         obj_asteroids = [None]*MAX_ASTEROIDS
                         obj_effects = [None]*MAX_EFFECTS
                         obj_pickups = [None]*MAX_PICKUP
                         g_gamestate = GAMESTATE["game"]
+                        clear_message()
                     elif g_gamestate == GAMESTATE["gameover"]:
                         g_timer = 0
                         g_gamestate = GAMESTATE["title"]
@@ -608,21 +765,14 @@ def main():
                     sprite = ASSETS.imgs_player_ship[0]
                     blit_rotate_center(screen, sprite, (g_player_pos["x"] - sprite.get_width()/2, g_player_pos["y"] - sprite.get_height()/2), g_player_angle, 0.5)
                 # UIの描画
-                draw_text(screen, "SCORE:{:09}".format(g_score), 150, 30, (255,255,255), fnt_s)
-                # draw_text(screen, "MONEY:{:09}".format(g_money), 150, 60, (255,255,255), fnt_s)
-                img_rotozoom = pygame.transform.rotozoom(ASSETS.imgs_player_ship[0], 0, 0.4)
-                if g_player_life > 0:
-                    for i in range(g_player_life):
-                        x = 30 + 50 * i
-                        y = 60
-                        screen.blit(img_rotozoom, [x, y])
+                draw_ui(screen, fnt_s)
         if g_gamestate == GAMESTATE["exploding"]:
             # 爆発
             # オブジェクトのアップデートと描画
             update_objects(screen)
             if g_timer % 10 == 0:
                 ASSETS.play("rock")
-                create_effect(g_player_pos["x"]+random.randint(-40,40), g_player_pos["y"]+random.randint(-40,40), EFFECT_TYPE["explosion"])
+                create_effect(g_player_pos["x"]+random.randint(-40,40), g_player_pos["y"]+random.randint(-40,40), EFFECT_TYPE["explosion"], 1.0)
             # プレイヤーの描画
             if g_timer - g_respawn_timer < PLAYER_SESPAWN_TIME and blink_timer():
                 pass
@@ -630,8 +780,7 @@ def main():
                 sprite = ASSETS.imgs_player_ship[0]
                 blit_rotate_center(screen, sprite, (g_player_pos["x"] - sprite.get_width()/2, g_player_pos["y"] - sprite.get_height()/2), g_player_angle, 0.5)
             # UIの描画
-            draw_text(screen, "SCORE:{:09}".format(g_score), 150, 30, (255,255,255), fnt_s)
-            img_rotozoom = pygame.transform.rotozoom(ASSETS.imgs_player_ship[0], 0, 0.4)
+            draw_ui(screen, fnt_s)
             if g_timer > 4*FPS:
                 timer = 0
                 g_gamestate = GAMESTATE["gameover"]
@@ -649,6 +798,30 @@ def main():
                 draw_text(screen, "Press [SPACE] to continue", WINDOW_W/2 + 20, WINDOW_H/2+250, (255,255,255), fnt_m)
         pygame.display.update()
         clock.tick(FPS)
+
+def draw_ui(screen, font):
+    draw_text(screen, "SCORE:{:09}".format(g_score), 150, 30, (255,255,255), font)
+    # draw_text(screen, "MONEY:{:09}".format(g_money), 150, 60, (255,255,255), font)
+    img_rotozoom = pygame.transform.rotozoom(ASSETS.imgs_player_ship[0], 0, 0.4)
+    # 残機
+    if g_player_life > 0:
+        for i in range(g_player_life):
+            x = 30 + 50 * i
+            y = 60
+            screen.blit(img_rotozoom, [x, y])
+    # ピックアップ
+    for i in range(POWERUP_NUM):
+        timer = g_player_pickup_effects[i]
+        if timer > 0:
+            if timer < (3 * FPS) and blink_timer(1, timer):
+                continue
+            img_rotozoom = pygame.transform.rotozoom(ASSETS.imgs_pickup[i], 0, 0.6)
+            screen.blit(img_rotozoom, [30 + 30 * i, 120])
+    #　メッセージ
+    if g_message_timer > g_timer:
+        draw_text(screen, g_message, WINDOW_W/2, WINDOW_H/2-20, (255,255,255), font)
+
+            
 
 def blink_timer(multiplier = 1, timer=None):
     """
