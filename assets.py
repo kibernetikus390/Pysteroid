@@ -4,6 +4,7 @@ from pathlib import Path
 class Assets:
     def __init__(self, pygame):
         self.pygame = pygame
+        self.img_arrow = pygame.image.load(Assets.make_absolute_path("/assets/arrow.png")).convert_alpha()
         self.img_title = pygame.image.load(Assets.make_absolute_path("/assets/logo.png")).convert_alpha()
         self.img_gameover = pygame.image.load(Assets.make_absolute_path("/assets/gameover.png")).convert_alpha()
         self.img_bg = pygame.image.load(Assets.make_absolute_path("/assets/galaxy.png")).convert_alpha()
@@ -26,17 +27,29 @@ class Assets:
             pygame.image.load(Assets.make_absolute_path("/assets/explosion4.png")).convert_alpha(),
             pygame.image.load(Assets.make_absolute_path("/assets/explosion5.png")).convert_alpha()
         ]
+        self.imgs_bomb = [
+            pygame.image.load(Assets.make_absolute_path("/assets/explosion_p_1.png")).convert_alpha(),
+            pygame.image.load(Assets.make_absolute_path("/assets/explosion_p_2.png")).convert_alpha(),
+            pygame.image.load(Assets.make_absolute_path("/assets/explosion_p_3.png")).convert_alpha(),
+            pygame.image.load(Assets.make_absolute_path("/assets/explosion_p_4.png")).convert_alpha(),
+            pygame.image.load(Assets.make_absolute_path("/assets/explosion_p_5.png")).convert_alpha()
+        ]
+        self.imgs_shield_enemy = [
+            self.imgs_explode[3], self.imgs_explode[4]
+        ]
         self.imgs_missile = [
             pygame.image.load(Assets.make_absolute_path("/assets/missile0.png")).convert_alpha(),
             pygame.image.load(Assets.make_absolute_path("/assets/missile1.png")).convert_alpha(),
-            pygame.image.load(Assets.make_absolute_path("/assets/missile2.png")).convert_alpha()
+            pygame.image.load(Assets.make_absolute_path("/assets/missile2.png")).convert_alpha(),
+            pygame.image.load(Assets.make_absolute_path("/assets/missile3.png")).convert_alpha()
         ]
         self.imgs_asteroid = [
             pygame.image.load(Assets.make_absolute_path("/assets/asteroid_big.png")).convert_alpha(),
             pygame.image.load(Assets.make_absolute_path("/assets/asteroid_small.png")).convert_alpha(),
             pygame.image.load(Assets.make_absolute_path("/assets/enemy1.png")).convert_alpha(),
             pygame.image.load(Assets.make_absolute_path("/assets/enemy2.png")).convert_alpha(),
-            pygame.image.load(Assets.make_absolute_path("/assets/enemy3.png")).convert_alpha()
+            pygame.image.load(Assets.make_absolute_path("/assets/enemy3.png")).convert_alpha(),
+            pygame.image.load(Assets.make_absolute_path("/assets/enemy8.png")).convert_alpha()
         ]
         self.imgs_diamond = [
             pygame.image.load(Assets.make_absolute_path("/assets/diamond_0.png")).convert_alpha(),
