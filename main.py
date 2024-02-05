@@ -46,7 +46,7 @@ BULLET_SPEED_ELITE_FIGHTER = 4
 MISSILE_ROTATE_SPEED = 1
 MISSILE_SPEED = 5
 # 隕石・敵機
-LVUP_RATE = 15*FPS
+LVUP_RATE = 20*FPS
 g_spawnrate = 3*FPS
 MAX_ASTEROIDS = 100
 obj_asteroids = [None]*MAX_ASTEROIDS
@@ -357,7 +357,7 @@ def create_enemy(pos=None, new_size=None, new_type=ASTEROID_TYPE["big"]):
             #     rs = 10
 
             # 速度
-            velocity = random.choice([0.8,1.0,1.2])
+            velocity = 0
             if new_type == ASTEROID_TYPE["enemyship1"]:
                 velocity = SPEED_ENEMY_INTERCEPTOR
             elif new_type == ASTEROID_TYPE["enemyship2"]:
@@ -367,7 +367,7 @@ def create_enemy(pos=None, new_size=None, new_type=ASTEROID_TYPE["big"]):
             elif new_type == ASTEROID_TYPE["enemy_bomber"]:
                 velocity = SPEED_ENEMY_BOMBER
             else:
-                velocity = random.choice([0.5,1.0,1.5,2.0,3.0])
+                velocity = random.choice([0.25, 0.5, 1.0, 1.5])
 
             # シールド
             shield = 0
@@ -401,7 +401,7 @@ def create_enemies():
         if g_timer % (LVUP_RATE) == 0 and g_timer != 0:
             # レベルアップ
             g_level += 1
-            g_spawnrate = int(2*FPS)
+            g_spawnrate = int(4*FPS)
             create_enemy(new_type=ASTEROID_TYPE["enemyship1"])
         if g_timer%g_spawnrate == 0:
             create_enemy()
@@ -409,7 +409,7 @@ def create_enemies():
         if g_timer % (LVUP_RATE) == 0 and g_timer != 0:
             # レベルアップ
             g_level += 1
-            g_spawnrate = int(2*FPS)
+            g_spawnrate = int(4*FPS)
             create_enemy(new_type=ASTEROID_TYPE["enemyship2"])
         if g_timer%g_spawnrate == 0:
             rand = random.randint(0,3)
@@ -421,7 +421,7 @@ def create_enemies():
         if g_timer % (LVUP_RATE) == 0 and g_timer != 0:
             # レベルアップ
             g_level += 1
-            g_spawnrate = int(1.75*FPS)
+            g_spawnrate = int(3*FPS)
             create_enemy(new_type=ASTEROID_TYPE["enemy_elite_fighter"])
         if g_timer%g_spawnrate == 0:
             rand = random.randint(0,5)
@@ -434,7 +434,7 @@ def create_enemies():
     else:
         if g_timer % (LVUP_RATE) == 0 and g_timer != 0:
             g_level += 1
-            g_spawnrate = int(g_spawnrate*0.9)
+            g_spawnrate = int(g_spawnrate*0.95)
         if g_timer%g_spawnrate == 0:
             rand = random.randint(0,7)
             if rand in (0,1):
@@ -558,7 +558,7 @@ def shoot_bullet_player():
     else:
         shoot_bullet(BULLET_TYPE["player"], None, g_player_angle)
 
-def shoot_bullet(type=BULLET_TYPE["player"], pos=None, angle=None, speed=0):
+def shoot_bullet(type=BULLET_TYPE["player"], pos=None, angle=None, speed=0, sound=True):
     """
     弾を発射
     """
@@ -576,12 +576,14 @@ def shoot_bullet(type=BULLET_TYPE["player"], pos=None, angle=None, speed=0):
             elif type == BULLET_TYPE["enemy_missile"]:
                 bullet_x = pos[0] - BULLET_OFFSET * math.sin(math.radians(angle))
                 bullet_y = pos[1] - BULLET_OFFSET * math.cos(math.radians(angle))
-                ASSETS.play("shot2")
+                if sound:
+                    ASSETS.play("shot2")
                 size = 1.5
             else:
                 bullet_x = pos[0] - BULLET_OFFSET * math.sin(math.radians(angle))
                 bullet_y = pos[1] - BULLET_OFFSET * math.cos(math.radians(angle))
-                ASSETS.play("shot2")
+                if sound:
+                    ASSETS.play("shot2")
                 size = 0.6
             obj_bullets[i] = {"x":bullet_x, "y":bullet_y, "r":angle, "s":size, "type":type, "timer":g_timer, "speed":speed}
             
@@ -673,19 +675,19 @@ def update_objects(screen):
                                 target_x = g_player_pos["x"] - g_player_velosity["x"] * distance / BULLET_SPEED_ENEMY_FIGHTER /2
                                 target_y = g_player_pos["y"] - g_player_velosity["y"] * distance / BULLET_SPEED_ENEMY_FIGHTER /2
                                 r = get_target_degree(obj["x"], obj["y"], target_x, target_y)
-                                shoot_bullet(type, (obj["x"], obj["y"]), r+10, speed)
+                                shoot_bullet(type, (obj["x"], obj["y"]), r+10, speed, False)
                                 shoot_bullet(type, (obj["x"], obj["y"]), r, speed*1.1)
-                                shoot_bullet(type, (obj["x"], obj["y"]), r-10, speed)
+                                shoot_bullet(type, (obj["x"], obj["y"]), r-10, speed, False)
                             if attack_type == 1:
                                 speed *= 1.5
                                 shoot_bullet(type, (obj["x"], obj["y"]), obj["r"], speed)
-                                shoot_bullet(type, (obj["x"], obj["y"]), obj["r"]+45, speed)
-                                shoot_bullet(type, (obj["x"], obj["y"]), obj["r"]+90, speed)
-                                shoot_bullet(type, (obj["x"], obj["y"]), obj["r"]+135, speed)
-                                shoot_bullet(type, (obj["x"], obj["y"]), obj["r"]+180, speed)
-                                shoot_bullet(type, (obj["x"], obj["y"]), obj["r"]+225, speed)
-                                shoot_bullet(type, (obj["x"], obj["y"]), obj["r"]+270, speed)
-                                shoot_bullet(type, (obj["x"], obj["y"]), obj["r"]+315, speed)
+                                shoot_bullet(type, (obj["x"], obj["y"]), obj["r"]+45, speed, False)
+                                shoot_bullet(type, (obj["x"], obj["y"]), obj["r"]+90, speed, False)
+                                shoot_bullet(type, (obj["x"], obj["y"]), obj["r"]+135, speed, False)
+                                shoot_bullet(type, (obj["x"], obj["y"]), obj["r"]+180, speed, False)
+                                shoot_bullet(type, (obj["x"], obj["y"]), obj["r"]+225, speed, False)
+                                shoot_bullet(type, (obj["x"], obj["y"]), obj["r"]+270, speed, False)
+                                shoot_bullet(type, (obj["x"], obj["y"]), obj["r"]+315, speed, False)
                             if attack_type == 2:
                                 distance = get_dis(g_player_pos["x"],g_player_pos["y"], obj["x"],obj["y"])
                                 target_x = g_player_pos["x"] - g_player_velosity["x"] * distance / BULLET_SPEED_ENEMY_FIGHTER /2
@@ -693,16 +695,16 @@ def update_objects(screen):
                                 r = get_target_degree(obj["x"], obj["y"], target_x, target_y)
                                 speed *= 2
                                 shoot_bullet(type, (obj["x"], obj["y"]), r, speed)
-                                shoot_bullet(type, (obj["x"], obj["y"]), r, speed*0.9)
-                                shoot_bullet(type, (obj["x"], obj["y"]), r, speed*0.8)
-                                shoot_bullet(type, (obj["x"], obj["y"]), r, speed*0.7)
+                                shoot_bullet(type, (obj["x"], obj["y"]), r, speed*0.9, False)
+                                shoot_bullet(type, (obj["x"], obj["y"]), r, speed*0.8, False)
+                                shoot_bullet(type, (obj["x"], obj["y"]), r, speed*0.7, False)
                     elif obj["type"] == ASTEROID_TYPE["enemy_bomber"]:
                         if(g_timer - obj["spawn_timer"]) % (TURNRATE_ENEMY_BOMBER) == 0:
                             obj["rot_speed"] = random.choice([0,0,-30,30])
                         if(g_timer - obj["spawn_timer"]) % (FIRERATE_ENEMY_BOMBER) == 0:
                             if random.randint(0,3) == 0:
                                 r = get_target_degree(obj["x"], obj["y"])
-                                shoot_bullet(BULLET_TYPE["enemy_missile"], (obj["x"], obj["y"]), obj["r"]+135, 4)
+                                shoot_bullet(BULLET_TYPE["enemy_missile"], (obj["x"], obj["y"]), obj["r"]+135, 4, False)
                                 shoot_bullet(BULLET_TYPE["enemy_missile"], (obj["x"], obj["y"]), obj["r"]-135, 4)
                             else:
                                 shoot_bullet(BULLET_TYPE["enemy_missile"], (obj["x"], obj["y"]), obj["r"], 4)
