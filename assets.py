@@ -78,11 +78,27 @@ class Assets:
             pygame.mixer.Sound(Assets.make_absolute_path("/assets/rock2.ogg")),
             pygame.mixer.Sound(Assets.make_absolute_path("/assets/rock3.ogg"))
         ]
+        self.volume = 0.5
         self.sound_pickup = pygame.mixer.Sound(Assets.make_absolute_path("/assets/pickup.ogg"))
         self.sound_shot = pygame.mixer.Sound(Assets.make_absolute_path("/assets/shot.ogg"))
         self.sound_shot2 = pygame.mixer.Sound(Assets.make_absolute_path("/assets/shot2.ogg"))
         self.sound_explosion = pygame.mixer.Sound(Assets.make_absolute_path("/assets/explosion.ogg"))
         self.sound_damage = pygame.mixer.Sound(Assets.make_absolute_path("/assets/damage.ogg"))
+        self.set_volume(self.volume)
+
+    def set_volume(self, volume):
+        self.volume = volume
+        self.sounds_rock[0].set_volume(volume)
+        self.sounds_rock[1].set_volume(volume)
+        self.sound_pickup.set_volume(volume)
+        self.sound_shot.set_volume(volume)
+        self.sound_shot2.set_volume(volume)
+        self.sound_explosion.set_volume(volume)
+        self.sound_damage.set_volume(volume)
+        self.pygame.mixer.music.set_volume(volume)
+    
+    def get_volume(self):
+        return self.volume
 
     def play_main_bgm(self):
             self.pygame.mixer.music.load(Assets.make_absolute_path("/assets/bensound-deepblue.mp3"))

@@ -22,6 +22,7 @@ BG_SCROLL_SPEED = {"x":1, "y":1}
 # プレイヤー
 PLAYER_SESPAWN_TIME = 3 * FPS
 g_timer = 0
+g_timer_ui = 0
 g_player_pos = {"x":WINDOW_W/2, "y":WINDOW_H/2}
 g_player_angle = 0
 g_player_life = 3
@@ -1094,6 +1095,11 @@ def main():
                     elif g_gamestate == GAMESTATE["pause"]:
                         g_gamestate = GAMESTATE["game"]
             if event.type == KEYUP:
+                # Volume
+                if event.key == K_f:
+                    ASSETS.set_volume(max(0, ASSETS.get_volume() - 0.1))
+                if event.key == K_r:
+                    ASSETS.set_volume(min(1, ASSETS.get_volume() + 0.1))
                 if event.key == K_SPACE:
                     if g_gamestate == GAMESTATE["title"]:
                         g_timer = 0
@@ -1135,10 +1141,11 @@ def main():
         if g_gamestate == GAMESTATE["title"]:
             # タイトルの描画
             screen.blit(ASSETS.img_title, [WINDOW_W/2-ASSETS.img_title.get_width()/2, WINDOW_H/2-ASSETS.img_title.get_height()/2])
-            draw_text(screen, "[ESC] pause / quit", WINDOW_W-150, WINDOW_H-30, (255,255,255), fnt_ss, anchor_center=False)
-            draw_text(screen, "[F1] Fullscreen", WINDOW_W-150, WINDOW_H-60, (255,255,255), fnt_ss, anchor_center=False)
-            draw_text(screen, "[SPACE] Fire", WINDOW_W-150, WINDOW_H-90, (255,255,255), fnt_ss, anchor_center=False)
-            draw_text(screen, "[WAD,Arrowkey] Ship ctrl", WINDOW_W-150, WINDOW_H-120, (255,255,255), fnt_ss, anchor_center=False)
+            draw_text(screen, "[R, F] Audio Vfolume", WINDOW_W-150, WINDOW_H-30, (255,255,255), fnt_ss, anchor_center=False)
+            draw_text(screen, "[ESC] pause / quit", WINDOW_W-150, WINDOW_H-60, (255,255,255), fnt_ss, anchor_center=False)
+            draw_text(screen, "[F1] Fullscreen", WINDOW_W-150, WINDOW_H-90, (255,255,255), fnt_ss, anchor_center=False)
+            draw_text(screen, "[SPACE] Fire, [Shift] Bomb", WINDOW_W-150, WINDOW_H-120, (255,255,255), fnt_ss, anchor_center=False)
+            draw_text(screen, "[WAD,Arrowkey] Ship ctrl", WINDOW_W-150, WINDOW_H-150, (255,255,255), fnt_ss, anchor_center=False)
             if blink_timer(5):
                 draw_text(screen, "Press [SPACE] to start", WINDOW_W/2 + 20, WINDOW_H/2+200, (255,255,255), fnt_m)
         if g_gamestate == GAMESTATE["game"]:
@@ -1215,11 +1222,14 @@ def draw_ui(screen, font):
     """
     UIを描画
     """
+    global g_timer_ui
+    if g_gamestate != GAMESTATE["exploding"]:
+        g_timer_ui = g_timer
     draw_text(screen, "SCORE:{:09}".format(g_score), 150, 30, (255,255,255), font)
     # draw_text(screen, "MONEY:{:09}".format(g_money), 150, 60, (255,255,255), font)
     img_rotozoom = pygame.transform.rotozoom(ASSETS.imgs_player_ship[0], 0, 0.4)
     # 時間
-    sec = int(g_timer / FPS)
+    sec = int(g_timer_ui / FPS)
     min = int(sec / 60)
     sec = str(sec%60)
     min = str(min)
@@ -1288,5 +1298,11 @@ def get_target_degree(x1,y1,x2=None,y2=None):
 def is_on_screen(x,y):
     return (0<=x<=WINDOW_W) and (0<=y<=WINDOW_H)
 
+my_out_file = open("./log.txt", "w")
+
 if __name__ == "__main__":
-    main()
+    try:
+        main()
+    except:
+        import traceback
+        traceback.print_exc(file=my_out_file)
